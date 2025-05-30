@@ -1,11 +1,15 @@
 #include "geometry/coordinate_transforms.hpp"
+#include "delta_constants.hpp"
 #include <cmath>
 
 namespace delta_robot {
 namespace geometry {
 
 std::array<double, 2> CoordinateTransforms::vectorToRollPitch(double x, double y, double z) {
-    if (std::abs(x) < 0.001 && std::abs(y) < 0.001 && std::abs(z) < 0.001) {
+    // Use consistent tolerance from constants
+    if (std::abs(x) < constants::COORDINATE_TOLERANCE && 
+        std::abs(y) < constants::COORDINATE_TOLERANCE && 
+        std::abs(z) < constants::COORDINATE_TOLERANCE) {
         return {0, 0};
     }
     double roll = -std::atan2(y, z);
@@ -30,7 +34,8 @@ double CoordinateTransforms::magnitude(const std::array<double, 3>& vec) {
 
 std::array<double, 3> CoordinateTransforms::normalize(const std::array<double, 3>& vec) {
     double mag = magnitude(vec);
-    if (mag < 1e-10) {
+    // Use vector magnitude tolerance from constants
+    if (mag < constants::VECTOR_MAGNITUDE_TOLERANCE) {
         return {0, 0, 0};
     }
     return {vec[0] / mag, vec[1] / mag, vec[2] / mag};

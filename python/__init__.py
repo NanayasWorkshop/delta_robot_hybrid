@@ -7,7 +7,7 @@ from .visualizer import DeltaVisualizer
 
 # Try to import C++ module
 try:
-    from .delta_robot_cpp import DeltaRobotMath
+    from .delta_robot_cpp import DeltaRobotMath, CalculationResult
     CPP_AVAILABLE = True
 except ImportError:
     CPP_AVAILABLE = False

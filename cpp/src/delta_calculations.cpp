@@ -16,18 +16,23 @@ DeltaCalculations::DeltaCalculations(
     working_height_(working_height),
     motor_limit_(motor_limit),
     resting_position_(resting_position),
-    epsilon_(constants::EPSILON),  // Use constant instead of hardcoded value
+    epsilon_(constants::EPSILON),
     static_geometry_(robot_radius),
     workspace_(working_height, workspace_cone_angle_rad)
 {
 }
 
-std::optional<std::vector<double>> DeltaCalculations::calculateJointValues(const std::array<double, 3>& target_point) {
+std::optional<CalculationResult> DeltaCalculations::calculateJointValues(const std::array<double, 3>& target_point) {
     utils::Timer total_timer;
+    
+    CalculationResult result;
+    result.original_target = target_point;
     
     // Step 1: Verify and correct target
     utils::Timer verify_timer;
     std::array<double, 3> corrected_target = workspace_.verifyAndCorrectTarget(target_point);
+    result.corrected_target = corrected_target;
+    result.workspace_corrected = !std::equal(target_point.begin(), target_point.end(), corrected_target.begin());
     last_timing_stats_.verify_and_correct_ms = verify_timer.elapsed_ms();
     
     // Step 2: Calculate top positions
@@ -49,6 +54,7 @@ std::optional<std::vector<double>> DeltaCalculations::calculateJointValues(const
     utils::Timer optimization_timer;
     std::array<double, 3> motor_positions = {Ar_z, Br_z, Cr_z};
     std::array<double, 3> optimized_motors = optimizeMotorPositions(motor_positions);
+    result.motor_positions = optimized_motors;
     
     // Recalculate with optimized positions
     std::array<double, 3> A_optimized = {Ar_x, Ar_y, optimized_motors[0]};
@@ -56,10 +62,12 @@ std::optional<std::vector<double>> DeltaCalculations::calculateJointValues(const
     std::array<double, 3> C_optimized = {Cr_x, Cr_y, optimized_motors[2]};
     
     std::array<double, 3> fermat_optimized = calculateFermatFromPoints(A_optimized, B_optimized, C_optimized);
+    result.fermat_point = fermat_optimized;
     double fermat_z_optimized = fermat_optimized[2];
     
     double current_total_length = 2 * fermat_z_optimized + resting_position_;
     double prismatic_length = current_total_length - resting_position_;
+    result.prismatic_length = prismatic_length;
     
     // Calculate plane normal
     std::array<double, 3> vec_AB = {
@@ -95,33 +103,47 @@ std::optional<std::vector<double>> DeltaCalculations::calculateJointValues(const
         plane_normal_unit[0], plane_normal_unit[1], plane_normal_unit[2]
     );
     
+    result.pitch = pitch;
+    result.roll = roll;
+    
     bool within_limits = validateLimits(pitch, roll, optimized_motors);
+    result.within_limits = within_limits;
     
     last_timing_stats_.optimization_ms = optimization_timer.elapsed_ms();
     last_timing_stats_.total_ms = total_timer.elapsed_ms();
     
-    // Prepare result
-    std::vector<double> result = {
-        pitch,
-        roll,
-        optimized_motors[0],
-        optimized_motors[1],
-        optimized_motors[2],
-        prismatic_length,
-        fermat_optimized[0],
-        fermat_optimized[1],
-        fermat_optimized[2],
-        static_cast<double>(within_limits),
-        target_point[0],
-        target_point[1],
-        target_point[2],
-        corrected_target[0],
-        corrected_target[1],
-        corrected_target[2],
-        static_cast<double>(!std::equal(target_point.begin(), target_point.end(), corrected_target.begin()))
-    };
-    
     return result;
+}
+
+std::optional<std::vector<double>> DeltaCalculations::calculateJointValuesLegacy(const std::array<double, 3>& target_point) {
+    auto result = calculateJointValues(target_point);
+    if (!result) {
+        return std::nullopt;
+    }
+    
+    return resultToLegacyVector(*result);
+}
+
+std::vector<double> DeltaCalculations::resultToLegacyVector(const CalculationResult& result) const {
+    return {
+        result.pitch,                           // [0]
+        result.roll,                            // [1]
+        result.motor_positions[0],              // [2]
+        result.motor_positions[1],              // [3]
+        result.motor_positions[2],              // [4]
+        result.prismatic_length,                // [5]
+        result.fermat_point[0],                 // [6]
+        result.fermat_point[1],                 // [7]
+        result.fermat_point[2],                 // [8]
+        static_cast<double>(result.within_limits),        // [9]
+        result.original_target[0],              // [10]
+        result.original_target[1],              // [11]
+        result.original_target[2],              // [12]
+        result.corrected_target[0],             // [13]
+        result.corrected_target[1],             // [14]
+        result.corrected_target[2],             // [15]
+        static_cast<double>(result.workspace_corrected)   // [16]
+    };
 }
 
 std::array<double, 3> DeltaCalculations::calculateTopPositions(const std::array<double, 3>& target_point) {
@@ -226,15 +248,18 @@ std::array<double, 3> DeltaCalculations::calculateFermatFromPoints(
     double AB_norm = geometry::CoordinateTransforms::magnitude(AB);
     double BC_norm = geometry::CoordinateTransforms::magnitude(BC);
     
-    // Calculate angles
-    double Alpha = std::acos(std::clamp(CA_dot_AB / (CA_norm * AB_norm), -1.0, 1.0));
-    double Beta = std::acos(std::clamp(AB_dot_BC / (AB_norm * BC_norm), -1.0, 1.0));
-    double Gamma = std::acos(std::clamp(BC_dot_CA / (BC_norm * CA_norm), -1.0, 1.0));
+    // Calculate angles using constants for clamping
+    double Alpha = std::acos(std::clamp(CA_dot_AB / (CA_norm * AB_norm), 
+                                       constants::TRIG_CLAMP_MIN, constants::TRIG_CLAMP_MAX));
+    double Beta = std::acos(std::clamp(AB_dot_BC / (AB_norm * BC_norm), 
+                                      constants::TRIG_CLAMP_MIN, constants::TRIG_CLAMP_MAX));
+    double Gamma = std::acos(std::clamp(BC_dot_CA / (BC_norm * CA_norm), 
+                                       constants::TRIG_CLAMP_MIN, constants::TRIG_CLAMP_MAX));
     
-    // Calculate lambdas
-    double LambdaA = a / std::max(std::sin(Alpha + M_PI/3), epsilon_);
-    double LambdaB = b / std::max(std::sin(Beta + M_PI/3), epsilon_);
-    double LambdaC = c / std::max(std::sin(Gamma + M_PI/3), epsilon_);
+    // Calculate lambdas using constants
+    double LambdaA = a / std::max(std::sin(Alpha + constants::FERMAT_ANGLE_OFFSET), constants::FERMAT_MIN_DENOMINATOR);
+    double LambdaB = b / std::max(std::sin(Beta + constants::FERMAT_ANGLE_OFFSET), constants::FERMAT_MIN_DENOMINATOR);
+    double LambdaC = c / std::max(std::sin(Gamma + constants::FERMAT_ANGLE_OFFSET), constants::FERMAT_MIN_DENOMINATOR);
     
     double total_lambda = LambdaA + LambdaB + LambdaC;
     double Fermat_x = (LambdaA * A_Point[0] + LambdaB * B_Point[0] + LambdaC * C_Point[0]) / total_lambda;

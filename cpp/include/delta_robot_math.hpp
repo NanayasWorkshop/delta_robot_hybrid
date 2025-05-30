@@ -14,8 +14,9 @@ namespace delta_robot {
  */
 class DeltaRobotMath {
 public:
-    // Re-export the TimingStats for backward compatibility
+    // Re-export types for backward compatibility
     using TimingStats = utils::TimingStats;
+    using CalculationResult = delta_robot::CalculationResult;
 
     /**
      * @brief Constructor with configuration parameters
@@ -30,11 +31,19 @@ public:
     );
 
     /**
-     * @brief Main calculation function
+     * @brief Main calculation function returning structured result
+     * @param target_point Target position [x, y, z]
+     * @return Optional CalculationResult containing all calculated values
+     */
+    std::optional<CalculationResult> calculateJointValues(const std::array<double, 3>& target_point);
+    
+    /**
+     * @brief Legacy calculation function returning vector format
      * @param target_point Target position [x, y, z]
      * @return Optional vector containing all calculated values
+     * @deprecated Use calculateJointValues() returning CalculationResult instead
      */
-    std::optional<std::vector<double>> calculateJointValues(const std::array<double, 3>& target_point);
+    std::optional<std::vector<double>> calculateJointValuesLegacy(const std::array<double, 3>& target_point);
     
     /**
      * @brief Helper function to verify and correct targets

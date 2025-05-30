@@ -16,8 +16,12 @@ DeltaRobotMath::DeltaRobotMath(
 {
 }
 
-std::optional<std::vector<double>> DeltaRobotMath::calculateJointValues(const std::array<double, 3>& target_point) {
+std::optional<CalculationResult> DeltaRobotMath::calculateJointValues(const std::array<double, 3>& target_point) {
     return calculator_.calculateJointValues(target_point);
+}
+
+std::optional<std::vector<double>> DeltaRobotMath::calculateJointValuesLegacy(const std::array<double, 3>& target_point) {
+    return calculator_.calculateJointValuesLegacy(target_point);
 }
 
 std::array<double, 3> DeltaRobotMath::verifyAndCorrectTarget(const std::array<double, 3>& target_point) {

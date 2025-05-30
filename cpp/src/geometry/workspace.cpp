@@ -1,4 +1,5 @@
 #include "geometry/workspace.hpp"
+#include "delta_constants.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -8,7 +9,7 @@ namespace geometry {
 Workspace::Workspace(double working_height, double workspace_cone_angle_rad)
     : working_height_(working_height),
       workspace_cone_angle_rad_(workspace_cone_angle_rad),
-      epsilon_(1e-10) {
+      epsilon_(constants::WORKSPACE_DISTANCE_TOLERANCE) {
 }
 
 std::array<double, 3> Workspace::verifyAndCorrectTarget(const std::array<double, 3>& target_point) const {
@@ -31,12 +32,15 @@ std::array<double, 3> Workspace::verifyAndCorrectTarget(const std::array<double,
     );
     
     if (H_to_target_distance < epsilon_) {
-        return {point_H[0], point_H[1], point_H[2] + 1.0};
+        // Use workspace correction offset from constants
+        return {point_H[0], point_H[1], point_H[2] + constants::WORKSPACE_CORRECTION_OFFSET};
     }
     
     std::array<double, 3> z_axis = {0, 0, 1};
     double dot_product = H_to_target[0] * z_axis[0] + H_to_target[1] * z_axis[1] + H_to_target[2] * z_axis[2];
-    double angle_from_z = std::acos(std::clamp(dot_product / H_to_target_distance, -1.0, 1.0));
+    // Use trigonometric clamping constants
+    double angle_from_z = std::acos(std::clamp(dot_product / H_to_target_distance, 
+                                              constants::TRIG_CLAMP_MIN, constants::TRIG_CLAMP_MAX));
     
     if (H_to_target[2] < 0 || angle_from_z > workspace_cone_angle_rad_) {
         return projectOntoConeBoundary(target_point, H_to_target, H_to_target_distance);
@@ -57,7 +61,7 @@ double Workspace::getWorkspaceConeAngle() const {
 }
 
 std::array<double, 3> Workspace::projectOntoConeBoundary(
-    const std::array<double, 3>& target_point,
+    const std::array<double, 3>& /* target_point */,  // Mark unused parameter
     const std::array<double, 3>& H_to_target,
     double H_to_target_distance
 ) const {

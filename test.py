@@ -22,20 +22,28 @@ def main():
                         help='Number of random points to generate')
     parser.add_argument('--visualize', action='store_true',
                         help='Visualize the results')
-    parser.add_argument('--compare', action='store_true',
-                        help='Compare Python and C++ implementations')
+    parser.add_argument('--compare-formats', action='store_true',
+                        help='Compare structured vs legacy format performance')
+    parser.add_argument('--test-legacy', action='store_true',
+                        help='Test legacy vector format compatibility')
     parser.add_argument('--save-plot', type=str, default='',
                         help='Save the visualization to a file')
     args = parser.parse_args()
     
-    # Report on available implementations
-    if CPP_AVAILABLE:
-        print("C++ implementation is available")
-    else:
-        print("C++ implementation is NOT available, using Python only")
+    # Check if C++ module is available
+    if not CPP_AVAILABLE:
+        print("ERROR: C++ implementation is required but not available")
+        print("Please build the C++ module first")
+        return 1
+    
+    print("C++ implementation is available")
     
     # Create the position generator
-    generator = PositionGenerator()
+    try:
+        generator = PositionGenerator()
+    except ImportError as e:
+        print(f"Error creating position generator: {e}")
+        return 1
     
     # Generate random positions
     print(f"Generating {args.num_points} random positions...")
@@ -48,31 +56,66 @@ def main():
     # Print statistics
     valid_results = sum(1 for r in results if r is not None)
     corrections = sum(1 for r in results if r is not None and r['workspace_corrected'])
+    within_limits = sum(1 for r in results if r is not None and r['within_limits'])
     
     print("\n=== Results ===")
     print(f"Total points processed: {args.num_points}")
     print(f"Valid results: {valid_results} ({valid_results/args.num_points:.1%})")
+    print(f"Within limits: {within_limits} ({within_limits/args.num_points:.1%})")
     print(f"Workspace corrections: {corrections} ({corrections/args.num_points:.1%})")
     print(f"Total processing time: {elapsed_time:.6f} seconds")
     print(f"Average time per point: {(elapsed_time/args.num_points)*1000:.6f} ms")
     print(f"Points processed per second: {args.num_points/elapsed_time:.1f}")
     
-    # Compare implementations if requested
-    if args.compare:
-        if CPP_AVAILABLE:
-            comparison = generator.compare_implementations(args.num_points)
-            
-            # Print more detailed timing info
-            print("\n=== Detailed C++ Timing ===")
-            if hasattr(generator.math_engine, 'get_last_operation_stats'):
-                stats = generator.math_engine.get_last_operation_stats()
-                print(f"Verify and correct: {stats.verify_and_correct_ms:.3f} ms")
-                print(f"Calculate top positions: {stats.calculate_top_positions_ms:.3f} ms")
-                print(f"Calculate Fermat point: {stats.calculate_fermat_ms:.3f} ms")
-                print(f"Optimization: {stats.optimization_ms:.3f} ms")
-                print(f"Total: {stats.total_ms:.3f} ms")
-        else:
-            print("\nCannot compare implementations: C++ module not available")
+    # Test legacy format compatibility if requested
+    if args.test_legacy:
+        print("\n=== Testing Legacy Format Compatibility ===")
+        legacy_results, legacy_time = generator.process_positions_legacy(positions)
+        
+        # Compare results
+        matching_legacy = 0
+        for new_res, legacy_res in zip(results, legacy_results):
+            if new_res is None and legacy_res is None:
+                matching_legacy += 1
+            elif new_res is not None and legacy_res is not None:
+                if (abs(new_res['pitch'] - legacy_res['pitch']) < 1e-10 and
+                    abs(new_res['roll'] - legacy_res['roll']) < 1e-10 and
+                    abs(new_res['motor_A'] - legacy_res['motor_A']) < 1e-10):
+                    matching_legacy += 1
+        
+        print(f"Legacy format time: {legacy_time:.6f} seconds")
+        print(f"Structured format time: {elapsed_time:.6f} seconds")
+        if legacy_time > 0:
+            print(f"Structured format overhead: {((elapsed_time/legacy_time)-1)*100:.1f}%")
+        print(f"Matching results: {matching_legacy}/{args.num_points}")
+    
+    # Compare formats if requested
+    if args.compare_formats:
+        comparison = generator.compare_formats(args.num_points)
+        
+        # Print more detailed timing info
+        print("\n=== Detailed C++ Timing ===")
+        if hasattr(generator.math_engine, 'get_last_operation_stats'):
+            stats = generator.math_engine.get_last_operation_stats()
+            print(f"Verify and correct: {stats.verify_and_correct_ms:.3f} ms")
+            print(f"Calculate top positions: {stats.calculate_top_positions_ms:.3f} ms")
+            print(f"Calculate Fermat point: {stats.calculate_fermat_ms:.3f} ms")
+            print(f"Optimization: {stats.optimization_ms:.3f} ms")
+            print(f"Total: {stats.total_ms:.3f} ms")
+    
+    # Show sample results
+    if valid_results > 0:
+        print("\n=== Sample Results ===")
+        sample_result = next(r for r in results if r is not None)
+        print(f"Sample calculation:")
+        print(f"  Target: {sample_result['original_target']}")
+        if sample_result['workspace_corrected']:
+            print(f"  Corrected: {sample_result['corrected_target']}")
+        print(f"  Pitch: {sample_result['pitch']:.4f} rad")
+        print(f"  Roll: {sample_result['roll']:.4f} rad")
+        print(f"  Motors: [{sample_result['motor_A']:.2f}, {sample_result['motor_B']:.2f}, {sample_result['motor_C']:.2f}]")
+        print(f"  Fermat: [{sample_result['fermat_point'][0]:.2f}, {sample_result['fermat_point'][1]:.2f}, {sample_result['fermat_point'][2]:.2f}]")
+        print(f"  Within limits: {sample_result['within_limits']}")
     
     # Visualize if requested
     if args.visualize or args.save_plot:
@@ -90,5 +133,7 @@ def main():
         if args.visualize:
             visualizer.show()
 
+    return 0
+
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

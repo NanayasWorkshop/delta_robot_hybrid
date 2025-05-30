@@ -9,6 +9,20 @@ namespace py = pybind11;
 PYBIND11_MODULE(delta_robot_cpp, m) {
     m.doc() = "Delta Robot C++ acceleration module";
     
+    // Bind the CalculationResult structure
+    py::class_<delta_robot::CalculationResult>(m, "CalculationResult")
+        .def(py::init<>())
+        .def_readwrite("pitch", &delta_robot::CalculationResult::pitch)
+        .def_readwrite("roll", &delta_robot::CalculationResult::roll)
+        .def_readwrite("motor_positions", &delta_robot::CalculationResult::motor_positions)
+        .def_readwrite("prismatic_length", &delta_robot::CalculationResult::prismatic_length)
+        .def_readwrite("fermat_point", &delta_robot::CalculationResult::fermat_point)
+        .def_readwrite("within_limits", &delta_robot::CalculationResult::within_limits)
+        .def_readwrite("original_target", &delta_robot::CalculationResult::original_target)
+        .def_readwrite("corrected_target", &delta_robot::CalculationResult::corrected_target)
+        .def_readwrite("workspace_corrected", &delta_robot::CalculationResult::workspace_corrected);
+    
+    // Bind the main DeltaRobotMath class
     py::class_<delta_robot::DeltaRobotMath>(m, "DeltaRobotMath")
         .def(py::init<double, double, double, double, double, double>(),
              py::arg("robot_radius"),
@@ -17,10 +31,14 @@ PYBIND11_MODULE(delta_robot_cpp, m) {
              py::arg("motor_limit"),
              py::arg("resting_position"),
              py::arg("workspace_cone_angle_rad"))
-        .def("calculate_joint_values", &delta_robot::DeltaRobotMath::calculateJointValues)
+        .def("calculate_joint_values", &delta_robot::DeltaRobotMath::calculateJointValues,
+             "Calculate joint values returning CalculationResult structure")
+        .def("calculate_joint_values_legacy", &delta_robot::DeltaRobotMath::calculateJointValuesLegacy,
+             "Calculate joint values returning legacy vector format (deprecated)")
         .def("verify_and_correct_target", &delta_robot::DeltaRobotMath::verifyAndCorrectTarget)
         .def("get_last_operation_stats", &delta_robot::DeltaRobotMath::getLastOperationStats);
     
+    // Bind TimingStats
     py::class_<delta_robot::DeltaRobotMath::TimingStats>(m, "TimingStats")
         .def_readonly("verify_and_correct_ms", &delta_robot::DeltaRobotMath::TimingStats::verify_and_correct_ms)
         .def_readonly("calculate_top_positions_ms", &delta_robot::DeltaRobotMath::TimingStats::calculate_top_positions_ms)
@@ -29,7 +47,7 @@ PYBIND11_MODULE(delta_robot_cpp, m) {
         .def_readonly("total_ms", &delta_robot::DeltaRobotMath::TimingStats::total_ms);
     
     // Expose constants
-    py::module constants = m.def_submodule("constants", "Delta robot constants");
+    py::module_ constants = m.def_submodule("constants", "Delta robot constants");
     
     // Robot Physical Constants
     constants.attr("ROBOT_RADIUS") = delta_robot::constants::ROBOT_RADIUS;
@@ -41,6 +59,25 @@ PYBIND11_MODULE(delta_robot_cpp, m) {
     // Mathematical Constants
     constants.attr("EPSILON") = delta_robot::constants::EPSILON;
     constants.attr("MS_CONVERSION_FACTOR") = delta_robot::constants::MS_CONVERSION_FACTOR;
+    
+    // Tolerance Constants
+    constants.attr("COORDINATE_TOLERANCE") = delta_robot::constants::COORDINATE_TOLERANCE;
+    constants.attr("GEOMETRIC_TOLERANCE") = delta_robot::constants::GEOMETRIC_TOLERANCE;
+    constants.attr("VECTOR_MAGNITUDE_TOLERANCE") = delta_robot::constants::VECTOR_MAGNITUDE_TOLERANCE;
+    constants.attr("ANGLE_TOLERANCE") = delta_robot::constants::ANGLE_TOLERANCE;
+    constants.attr("MIN_DISTANCE_TOLERANCE") = delta_robot::constants::MIN_DISTANCE_TOLERANCE;
+    constants.attr("WORKSPACE_DISTANCE_TOLERANCE") = delta_robot::constants::WORKSPACE_DISTANCE_TOLERANCE;
+    
+    // Trigonometric Constants
+    constants.attr("TRIG_CLAMP_MIN") = delta_robot::constants::TRIG_CLAMP_MIN;
+    constants.attr("TRIG_CLAMP_MAX") = delta_robot::constants::TRIG_CLAMP_MAX;
+    
+    // Fermat Point Constants
+    constants.attr("FERMAT_ANGLE_OFFSET") = delta_robot::constants::FERMAT_ANGLE_OFFSET;
+    constants.attr("FERMAT_MIN_DENOMINATOR") = delta_robot::constants::FERMAT_MIN_DENOMINATOR;
+    
+    // Workspace Constants
+    constants.attr("WORKSPACE_CORRECTION_OFFSET") = delta_robot::constants::WORKSPACE_CORRECTION_OFFSET;
     
     // Geometry Constants
     constants.attr("BASE_A_ANGLE") = delta_robot::constants::BASE_A_ANGLE;
