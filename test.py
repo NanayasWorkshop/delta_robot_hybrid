@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Test script for Delta Robot hybrid Python/C++ implementation
+Now includes mathematical step visualization
 """
 
 import time
@@ -15,6 +16,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # Import our package
 from python import PositionGenerator, DeltaVisualizer, CPP_AVAILABLE
 
+# Try to import math visualizer
+try:
+    from python.math_visualizer import DeltaMathVisualizer
+    MATH_VIZ_AVAILABLE = True
+except ImportError:
+    print("Math visualizer not available")
+    MATH_VIZ_AVAILABLE = False
+
 def main():
     """Main test function"""
     parser = argparse.ArgumentParser(description='Test Delta Robot Calculations')
@@ -22,12 +31,18 @@ def main():
                         help='Number of random points to generate')
     parser.add_argument('--visualize', action='store_true',
                         help='Visualize the results')
+    parser.add_argument('--visualize-math', action='store_true',
+                        help='Visualize the mathematical steps (Step 2 & 3)')
+    parser.add_argument('--math-points', type=str, default='10,5,20',
+                        help='Point to visualize math steps for (format: x,y,z)')
     parser.add_argument('--compare-formats', action='store_true',
                         help='Compare structured vs legacy format performance')
     parser.add_argument('--test-legacy', action='store_true',
                         help='Test legacy vector format compatibility')
     parser.add_argument('--save-plot', type=str, default='',
                         help='Save the visualization to a file')
+    parser.add_argument('--save-math-plot', type=str, default='',
+                        help='Save the math visualization to a file')
     args = parser.parse_args()
     
     # Check if C++ module is available
@@ -37,6 +52,72 @@ def main():
         return 1
     
     print("C++ implementation is available")
+    
+    # Math visualization if requested
+    if args.visualize_math:
+        if not MATH_VIZ_AVAILABLE:
+            print("ERROR: Math visualizer not available")
+            print("Please ensure matplotlib is installed and math_visualizer.py exists")
+            return 1
+        
+        print("=== Mathematical Step Visualization ===")
+        
+        # Parse the target point
+        try:
+            math_point = [float(x.strip()) for x in args.math_points.split(',')]
+            if len(math_point) != 3:
+                raise ValueError("Point must have 3 coordinates")
+        except ValueError as e:
+            print(f"Error parsing math point '{args.math_points}': {e}")
+            print("Use format: x,y,z (e.g., 10,5,20)")
+            return 1
+        
+        # Create math visualizer
+        try:
+            math_viz = DeltaMathVisualizer()
+            print(f"Visualizing mathematical steps for point: {math_point}")
+            
+            # Create the visualization
+            save_path = args.save_math_plot if args.save_math_plot else None
+            math_data = math_viz.visualize_complete_calculation(math_point, save_path)
+            
+            if math_data:
+                print("✓ Mathematical visualization complete!")
+                
+                # Print some extracted data for verification
+                step2 = math_data['step2_data']
+                step3 = math_data['step3_data']
+                cpp_result = math_data['cpp_result']
+                
+                print(f"\nExtracted Step 2 Data:")
+                print(f"  Direction vector: {step2['direction_vector']}")
+                print(f"  Actuator heights: {[f'{h:.2f}' for h in step2['actuator_heights']]}")
+                
+                print(f"\nExtracted Step 3 Data:")
+                print(f"  Triangle sides: a={step3['side_lengths']['a']:.2f}, b={step3['side_lengths']['b']:.2f}, c={step3['side_lengths']['c']:.2f}")
+                print(f"  Fermat point: {[f'{f:.2f}' for f in step3['fermat_point']]}")
+                
+                print(f"\nC++ Result Validation:")
+                print(f"  Fermat match: {np.allclose(step3['fermat_point'], cpp_result.fermat_point, atol=1e-6)}")
+                print(f"  Final pitch: {cpp_result.pitch:.4f} rad ({np.degrees(cpp_result.pitch):.2f}°)")
+                print(f"  Final roll: {cpp_result.roll:.4f} rad ({np.degrees(cpp_result.roll):.2f}°)")
+                
+                # Show the plot if no save path specified
+                if not save_path:
+                    import matplotlib.pyplot as plt
+                    plt.show()
+                
+            else:
+                print("✗ Mathematical visualization failed!")
+                return 1
+                
+        except Exception as e:
+            print(f"Error creating math visualization: {e}")
+            return 1
+        
+        # If only math visualization requested, exit here
+        if not any([args.visualize, args.compare_formats, args.test_legacy, args.num_points != 1000]):
+            return 0
     
     # Create the position generator
     try:

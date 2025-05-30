@@ -11,3 +11,10 @@ try:
     CPP_AVAILABLE = True
 except ImportError:
     CPP_AVAILABLE = False
+
+# Try to import math visualizer
+try:
+    from .math_visualizer import DeltaMathVisualizer
+    MATH_VIZ_AVAILABLE = True
+except ImportError:
+    MATH_VIZ_AVAILABLE = False
