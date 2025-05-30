@@ -1,4 +1,5 @@
 #include "delta_robot_math.hpp"
+#include "delta_constants.hpp"
 
 namespace delta_robot {
 
@@ -9,7 +10,9 @@ DeltaRobotMath::DeltaRobotMath(
     double motor_limit,
     double resting_position,
     double workspace_cone_angle_rad
-) : calculator_(robot_radius, min_height, working_height, motor_limit, resting_position, workspace_cone_angle_rad)
+) : calculator_(robot_radius, min_height, working_height, motor_limit, resting_position, workspace_cone_angle_rad),
+    working_height_(working_height),
+    workspace_cone_angle_rad_(workspace_cone_angle_rad)
 {
 }
 
@@ -18,9 +21,8 @@ std::optional<std::vector<double>> DeltaRobotMath::calculateJointValues(const st
 }
 
 std::array<double, 3> DeltaRobotMath::verifyAndCorrectTarget(const std::array<double, 3>& target_point) {
-    // We need to access the workspace component - let's add a getter to DeltaCalculations
-    // For now, create a temporary workspace object with the same parameters
-    geometry::Workspace workspace(11.5, 0.5236); // These should come from constructor params
+    // Use the correct parameters from constructor instead of hardcoded values
+    geometry::Workspace workspace(working_height_, workspace_cone_angle_rad_);
     return workspace.verifyAndCorrectTarget(target_point);
 }
 

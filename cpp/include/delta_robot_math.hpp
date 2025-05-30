@@ -52,6 +52,10 @@ public:
 private:
     // The actual calculation engine
     DeltaCalculations calculator_;
+    
+    // Store parameters needed for workspace verification
+    double working_height_;
+    double workspace_cone_angle_rad_;
 };
 
 } // namespace delta_robot

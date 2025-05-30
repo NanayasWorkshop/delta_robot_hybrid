@@ -7,17 +7,35 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from typing import List, Dict, Optional
 
+# Import constants from C++ module if available
+try:
+    from .delta_robot_cpp import constants
+    CPP_AVAILABLE = True
+except ImportError:
+    CPP_AVAILABLE = False
+
 class DeltaVisualizer:
     """Visualize delta robot positions and results"""
     
     def __init__(self, 
-                 robot_radius: float = 24.8, 
-                 min_height: float = 101.0,
-                 working_height: float = 11.5):
-        """Initialize with robot parameters"""
-        self.robot_radius = robot_radius
-        self.min_height = min_height
-        self.working_height = working_height
+                 robot_radius: float = None, 
+                 min_height: float = None,
+                 working_height: float = None):
+        """Initialize with robot parameters (uses constants if not provided)"""
+        
+        # Use constants from C++ module if available, otherwise use defaults
+        if CPP_AVAILABLE:
+            self.robot_radius = robot_radius or constants.ROBOT_RADIUS
+            self.min_height = min_height or constants.MIN_HEIGHT
+            self.working_height = working_height or constants.WORKING_HEIGHT
+            self.workspace_cone_angle_rad = constants.WORKSPACE_CONE_ANGLE_RAD
+        else:
+            # Fallback defaults (should match the constants)
+            self.robot_radius = robot_radius or 24.8
+            self.min_height = min_height or 101.0
+            self.working_height = working_height or 11.5
+            self.workspace_cone_angle_rad = 0.5236  # 30 degrees
+        
         self.fig = None
         self.ax = None
     
@@ -35,8 +53,8 @@ class DeltaVisualizer:
         self.ax.plot(x, y, z, 'b-', alpha=0.5)
         
         # Plot the workspace cone
-        h = 40  # Height of cone
-        cone_radius = h * np.tan(30 * np.pi / 180)  # 30 degree cone
+        h = 40  # Height of cone for visualization
+        cone_radius = h * np.tan(self.workspace_cone_angle_rad)  # Use actual cone angle from constants
         
         # Draw cone base
         cone_base_z = self.working_height + h
@@ -53,8 +71,13 @@ class DeltaVisualizer:
             self.ax.plot([0, x_cone[i]], [0, y_cone[i]], 
                          [self.working_height, cone_base_z], 'g-', alpha=0.2)
         
-        # Plot robot base joints
-        base_angles = [0, -np.pi/6, -5*np.pi/6]
+        # Plot robot base joints using constants if available
+        if CPP_AVAILABLE:
+            base_angles = [constants.BASE_A_ANGLE, constants.BASE_B_ANGLE, constants.BASE_C_ANGLE]
+        else:
+            # Fallback to hardcoded values
+            base_angles = [0, -np.pi/6, -5*np.pi/6]
+            
         base_x = [self.robot_radius * np.cos(angle) for angle in base_angles]
         base_y = [self.robot_radius * np.sin(angle) for angle in base_angles]
         base_z = [self.min_height] * 3

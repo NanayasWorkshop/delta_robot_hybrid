@@ -31,7 +31,7 @@ class PyDeltaRobotMath:
 
 # Import C++ module (will be available after building)
 try:
-    from .delta_robot_cpp import DeltaRobotMath
+    from .delta_robot_cpp import DeltaRobotMath, constants
     CPP_AVAILABLE = True
 except ImportError:
     print("Warning: C++ module not found, using Python implementation")
@@ -41,25 +41,36 @@ class PositionGenerator:
     """Generates random positions for delta robot testing"""
     
     def __init__(self, 
-                 robot_radius: float = 24.8,
-                 min_height: float = 101.0,
-                 working_height: float = 11.5,
-                 motor_limit: float = 11.0):
-        """Initialize with robot parameters"""
-        self.robot_radius = robot_radius
-        self.min_height = min_height
-        self.working_height = working_height
-        self.motor_limit = motor_limit
-        self.resting_position = 2 * motor_limit + min_height
-        self.workspace_cone_angle_rad = 0.5236  # 30 degrees
+                 robot_radius: float = None,
+                 min_height: float = None,
+                 working_height: float = None,
+                 motor_limit: float = None):
+        """Initialize with robot parameters (uses constants if not provided)"""
+        
+        # Use constants from C++ module if available, otherwise use defaults
+        if CPP_AVAILABLE:
+            self.robot_radius = robot_radius or constants.ROBOT_RADIUS
+            self.min_height = min_height or constants.MIN_HEIGHT
+            self.working_height = working_height or constants.WORKING_HEIGHT
+            self.motor_limit = motor_limit or constants.MOTOR_LIMIT
+            self.workspace_cone_angle_rad = constants.WORKSPACE_CONE_ANGLE_RAD
+        else:
+            # Fallback defaults (should match the constants)
+            self.robot_radius = robot_radius or 24.8
+            self.min_height = min_height or 101.0
+            self.working_height = working_height or 11.5
+            self.motor_limit = motor_limit or 11.0
+            self.workspace_cone_angle_rad = 0.5236  # 30 degrees
+        
+        self.resting_position = 2 * self.motor_limit + self.min_height
         
         # Initialize the math engine
         if CPP_AVAILABLE:
             self.math_engine = DeltaRobotMath(
-                robot_radius,
-                min_height,
-                working_height,
-                motor_limit,
+                self.robot_radius,
+                self.min_height,
+                self.working_height,
+                self.motor_limit,
                 self.resting_position,
                 self.workspace_cone_angle_rad
             )

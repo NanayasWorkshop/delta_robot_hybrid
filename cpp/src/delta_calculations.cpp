@@ -1,4 +1,5 @@
 #include "delta_calculations.hpp"
+#include "delta_constants.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -15,7 +16,7 @@ DeltaCalculations::DeltaCalculations(
     working_height_(working_height),
     motor_limit_(motor_limit),
     resting_position_(resting_position),
-    epsilon_(1e-10),
+    epsilon_(constants::EPSILON),  // Use constant instead of hardcoded value
     static_geometry_(robot_radius),
     workspace_(working_height, workspace_cone_angle_rad)
 {

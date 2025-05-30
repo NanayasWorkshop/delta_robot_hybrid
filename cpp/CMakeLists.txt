@@ -39,3 +39,10 @@ if(MSVC)
 else()
     target_compile_options(delta_robot_cpp PRIVATE -Wall -Wextra -pedantic)
 endif()
+
+# Debug executable
+add_executable(debug_test
+    src/debug_main.cpp
+    ${SOURCES}
+)
+target_include_directories(debug_test PRIVATE include)
