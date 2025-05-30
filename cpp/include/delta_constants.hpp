@@ -34,9 +34,6 @@ constexpr double TRIG_CLAMP_MAX = 1.0;
 constexpr double FERMAT_ANGLE_OFFSET = M_PI / 3.0;  // 60 degrees for Fermat geometry
 constexpr double FERMAT_MIN_DENOMINATOR = EPSILON;  // Prevent division by zero
 
-// =================== Workspace Constants ===================
-constexpr double WORKSPACE_CORRECTION_OFFSET = 1.0;  // mm - offset when target too close to origin
-
 // =================== Geometry Constants ===================
 // Base actuator positions (angles in radians)
 constexpr double BASE_A_ANGLE = M_PI / 2.0;                // 0 degrees (top)

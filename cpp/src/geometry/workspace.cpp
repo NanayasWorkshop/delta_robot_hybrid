@@ -31,11 +31,6 @@ std::array<double, 3> Workspace::verifyAndCorrectTarget(const std::array<double,
         H_to_target[2] * H_to_target[2]
     );
     
-    if (H_to_target_distance < epsilon_) {
-        // Use workspace correction offset from constants
-        return {point_H[0], point_H[1], point_H[2] + constants::WORKSPACE_CORRECTION_OFFSET};
-    }
-    
     std::array<double, 3> z_axis = {0, 0, 1};
     double dot_product = H_to_target[0] * z_axis[0] + H_to_target[1] * z_axis[1] + H_to_target[2] * z_axis[2];
     // Use trigonometric clamping constants

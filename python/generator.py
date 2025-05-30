@@ -56,7 +56,7 @@ class PositionGenerator:
             # Using a cone-like distribution
             
             # Random radius with square distribution (more points near center)
-            r = np.random.random() ** 0.5 * 25  # Max radius of ~25mm
+            r = np.random.random() ** 0.5 * 50  # Max radius of ~25mm
             
             # Random angle
             theta = np.random.random() * 2 * np.pi
@@ -66,7 +66,7 @@ class PositionGenerator:
             y = r * np.sin(theta)
             
             # Height biased toward reasonable workspace heights
-            z = np.random.uniform(12, 30)
+            z = np.random.uniform(50, 120)
             
             positions.append(np.array([x, y, z]))
             

@@ -3,6 +3,7 @@
 #include <array>
 #include <vector>
 #include <optional>
+#include "calculation_result.hpp"
 #include "delta_calculations.hpp"
 #include "utils/timing.hpp"
 

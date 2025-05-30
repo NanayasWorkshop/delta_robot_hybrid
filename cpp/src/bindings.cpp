@@ -76,9 +76,6 @@ PYBIND11_MODULE(delta_robot_cpp, m) {
     constants.attr("FERMAT_ANGLE_OFFSET") = delta_robot::constants::FERMAT_ANGLE_OFFSET;
     constants.attr("FERMAT_MIN_DENOMINATOR") = delta_robot::constants::FERMAT_MIN_DENOMINATOR;
     
-    // Workspace Constants
-    constants.attr("WORKSPACE_CORRECTION_OFFSET") = delta_robot::constants::WORKSPACE_CORRECTION_OFFSET;
-    
     // Geometry Constants
     constants.attr("BASE_A_ANGLE") = delta_robot::constants::BASE_A_ANGLE;
     constants.attr("BASE_B_ANGLE") = delta_robot::constants::BASE_B_ANGLE;

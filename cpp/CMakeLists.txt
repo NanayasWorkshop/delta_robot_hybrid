@@ -12,7 +12,7 @@ find_package(pybind11 CONFIG REQUIRED)
 # Add include directories
 include_directories(include)
 
-# Add all source files
+# Add all source files including new math modules
 set(SOURCES 
     src/delta_robot_math.cpp
     src/delta_calculations.cpp
@@ -20,6 +20,11 @@ set(SOURCES
     src/geometry/workspace.cpp
     src/geometry/coordinate_transforms.cpp
     src/utils/timing.cpp
+    # NEW mathematical modules
+    src/math/kinematics.cpp
+    src/math/optimization.cpp
+    src/math/orientation.cpp
+    src/math/math_orchestrator.cpp
 )
 
 # Create a shared library
