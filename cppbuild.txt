@@ -1,0 +1,11 @@
+cd cpp
+mkdir build
+cd build
+cmake ..
+cmake --build . --config Release
+
+
+
+
+cd ../..
+python3 test.py --num-points 100 --compare --visualize
