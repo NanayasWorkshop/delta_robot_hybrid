@@ -1,5 +1,6 @@
 #include "math/kinematics.hpp"
 #include "geometry/coordinate_transforms.hpp"
+#include "eigen_utils.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -20,7 +21,8 @@ std::array<double, 3> Kinematics::calculateTopPositions(const std::array<double,
     
     double direction_length = geometry::CoordinateTransforms::magnitude(last_data_.direction_vector);
     
-    if (direction_length < constants::EPSILON) {
+    // Improved numerical stability check
+    if (direction_length < constants::VECTOR_MAGNITUDE_TOLERANCE) {
         std::array<double, 3> fallback = {constants::MIN_HEIGHT, constants::MIN_HEIGHT, constants::MIN_HEIGHT};
         return fallback;
     }
@@ -49,7 +51,8 @@ std::array<double, 3> Kinematics::calculateTopPositions(const std::array<double,
     double u_y = last_data_.u_vector[1];
     double u_z = last_data_.u_vector[2];
     
-    if (std::abs(u_z) < constants::EPSILON) {
+    // Improved division by zero check using constants
+    if (!constants::is_safe_for_division(u_z)) {
         std::array<double, 3> fallback = {constants::MIN_HEIGHT, constants::MIN_HEIGHT, constants::MIN_HEIGHT};
         return fallback;
     }
@@ -70,40 +73,46 @@ std::array<double, 3> Kinematics::calculateTopPositions(const std::array<double,
 std::array<double, 3> Kinematics::calculateFermatPoint(
     const std::array<std::array<double, 3>, 3>& actuator_positions
 ) {
-    const auto& A_Point = actuator_positions[0];
-    const auto& B_Point = actuator_positions[1];
-    const auto& C_Point = actuator_positions[2];
+    // Use Eigen for improved numerical stability and performance
+    Eigen::Vector3d A = eigen_utils::arrayToVector3d(actuator_positions[0]);
+    Eigen::Vector3d B = eigen_utils::arrayToVector3d(actuator_positions[1]);
+    Eigen::Vector3d C = eigen_utils::arrayToVector3d(actuator_positions[2]);
     
-    // Step 3a: Calculate triangle sides
-    last_data_.triangle_sides = calculateTriangleSides(actuator_positions);
+    // Analyze triangle properties using Eigen utilities
+    auto triangle_props = eigen_utils::analyzeTriangle(A, B, C);
     
-    // Step 3b: Calculate triangle angles
-    last_data_.triangle_angles = calculateTriangleAngles(actuator_positions, last_data_.triangle_sides);
+    // Store data for debugging
+    last_data_.triangle_sides = triangle_props.side_lengths;
+    last_data_.triangle_angles = triangle_props.angles;
     
-    // Step 3c: Calculate lambda weights
+    // Check for degenerate triangle
+    if (triangle_props.is_degenerate) {
+        // Return centroid for degenerate cases
+        Eigen::Vector3d centroid = (A + B + C) / 3.0;
+        return eigen_utils::vector3dToArray(centroid);
+    }
+    
+    // Calculate lambda weights with improved numerical stability
     last_data_.lambda_weights = calculateLambdaWeights(last_data_.triangle_sides, last_data_.triangle_angles);
     
-    // Step 3d: Calculate weighted Fermat point
+    // Calculate weighted Fermat point
     double LambdaA = last_data_.lambda_weights[0];
     double LambdaB = last_data_.lambda_weights[1];
     double LambdaC = last_data_.lambda_weights[2];
     
     double total_lambda = LambdaA + LambdaB + LambdaC;
     
-    if (total_lambda < constants::EPSILON) {
+    // Improved fallback handling
+    if (!constants::is_safe_for_division(total_lambda)) {
         // Fallback to centroid
-        return {
-            (A_Point[0] + B_Point[0] + C_Point[0]) / 3,
-            (A_Point[1] + B_Point[1] + C_Point[1]) / 3,
-            (A_Point[2] + B_Point[2] + C_Point[2]) / 3
-        };
+        Eigen::Vector3d centroid = (A + B + C) / 3.0;
+        return eigen_utils::vector3dToArray(centroid);
     }
     
-    double Fermat_x = (LambdaA * A_Point[0] + LambdaB * B_Point[0] + LambdaC * C_Point[0]) / total_lambda;
-    double Fermat_y = (LambdaA * A_Point[1] + LambdaB * B_Point[1] + LambdaC * C_Point[1]) / total_lambda;
-    double Fermat_z = (LambdaA * A_Point[2] + LambdaB * B_Point[2] + LambdaC * C_Point[2]) / total_lambda;
+    // Calculate weighted average using Eigen
+    Eigen::Vector3d fermat = (LambdaA * A + LambdaB * B + LambdaC * C) / total_lambda;
     
-    return {Fermat_x, Fermat_y, Fermat_z};
+    return eigen_utils::vector3dToArray(fermat);
 }
 
 // Private helper methods
@@ -112,7 +121,10 @@ std::array<double, 3> Kinematics::createDirectionVector(const std::array<double,
 }
 
 std::array<double, 3> Kinematics::calculatePlaneNormal(const std::array<double, 3>& direction_vector) {
-    return geometry::CoordinateTransforms::normalize(direction_vector);
+    // Use Eigen for better numerical stability
+    Eigen::Vector3d dir = eigen_utils::arrayToVector3d(direction_vector);
+    Eigen::Vector3d normalized = geometry::CoordinateTransforms::safeNormalize(dir);
+    return eigen_utils::vector3dToArray(normalized);
 }
 
 std::array<double, 3> Kinematics::mirrorWorkingHeightPoint(
@@ -174,44 +186,19 @@ std::array<double, 3> Kinematics::calculateTriangleAngles(
     const std::array<std::array<double, 3>, 3>& points,
     const std::array<double, 3>& /* sides */
 ) {
-    const auto& A_Point = points[0];
-    const auto& B_Point = points[1];
-    const auto& C_Point = points[2];
+    // Use Eigen for better numerical stability
+    Eigen::Vector3d A = eigen_utils::arrayToVector3d(points[0]);
+    Eigen::Vector3d B = eigen_utils::arrayToVector3d(points[1]);
+    Eigen::Vector3d C = eigen_utils::arrayToVector3d(points[2]);
     
-    std::array<double, 3> AB = {
-        B_Point[0] - A_Point[0],
-        B_Point[1] - A_Point[1],
-        B_Point[2] - A_Point[2]
-    };
+    Eigen::Vector3d AB = B - A;
+    Eigen::Vector3d BC = C - B;
+    Eigen::Vector3d CA = A - C;
     
-    std::array<double, 3> BC = {
-        C_Point[0] - B_Point[0],
-        C_Point[1] - B_Point[1],
-        C_Point[2] - B_Point[2]
-    };
-    
-    std::array<double, 3> CA = {
-        A_Point[0] - C_Point[0],
-        A_Point[1] - C_Point[1],
-        A_Point[2] - C_Point[2]
-    };
-    
-    // Calculate dot products
-    double CA_dot_AB = -CA[0]*AB[0] - CA[1]*AB[1] - CA[2]*AB[2];
-    double AB_dot_BC = -AB[0]*BC[0] - AB[1]*BC[1] - AB[2]*BC[2];
-    double BC_dot_CA = -BC[0]*CA[0] - BC[1]*CA[1] - BC[2]*CA[2];
-    
-    double CA_norm = geometry::CoordinateTransforms::magnitude(CA);
-    double AB_norm = geometry::CoordinateTransforms::magnitude(AB);
-    double BC_norm = geometry::CoordinateTransforms::magnitude(BC);
-    
-    // Calculate angles using constants for clamping
-    double Alpha = std::acos(std::clamp(CA_dot_AB / (CA_norm * AB_norm), 
-                                       constants::TRIG_CLAMP_MIN, constants::TRIG_CLAMP_MAX));
-    double Beta = std::acos(std::clamp(AB_dot_BC / (AB_norm * BC_norm), 
-                                      constants::TRIG_CLAMP_MIN, constants::TRIG_CLAMP_MAX));
-    double Gamma = std::acos(std::clamp(BC_dot_CA / (BC_norm * CA_norm), 
-                                       constants::TRIG_CLAMP_MIN, constants::TRIG_CLAMP_MAX));
+    // Calculate angles using safe angle calculation
+    double Alpha = geometry::CoordinateTransforms::safeAngleBetween(-CA, AB);
+    double Beta = geometry::CoordinateTransforms::safeAngleBetween(-AB, BC);
+    double Gamma = geometry::CoordinateTransforms::safeAngleBetween(-BC, CA);
     
     return {Alpha, Beta, Gamma};
 }
@@ -228,10 +215,18 @@ std::array<double, 3> Kinematics::calculateLambdaWeights(
     double Beta = angles[1];
     double Gamma = angles[2];
     
-    // Calculate lambdas using constants
-    double LambdaA = a / std::max(std::sin(Alpha + constants::FERMAT_ANGLE_OFFSET), constants::FERMAT_MIN_DENOMINATOR);
-    double LambdaB = b / std::max(std::sin(Beta + constants::FERMAT_ANGLE_OFFSET), constants::FERMAT_MIN_DENOMINATOR);
-    double LambdaC = c / std::max(std::sin(Gamma + constants::FERMAT_ANGLE_OFFSET), constants::FERMAT_MIN_DENOMINATOR);
+    // Calculate lambdas with improved numerical stability
+    auto safe_lambda = [](double side, double angle) -> double {
+        double sin_value = std::sin(angle + constants::FERMAT_ANGLE_OFFSET);
+        if (constants::is_safe_for_division(sin_value)) {
+            return side / sin_value;
+        }
+        return 0.0;  // Safe fallback
+    };
+    
+    double LambdaA = safe_lambda(a, Alpha);
+    double LambdaB = safe_lambda(b, Beta);
+    double LambdaC = safe_lambda(c, Gamma);
     
     return {LambdaA, LambdaB, LambdaC};
 }

@@ -1,4 +1,6 @@
 #include "math/orientation.hpp"
+#include "geometry/coordinate_transforms.hpp"
+#include "eigen_utils.hpp"
 #include <cmath>
 
 namespace delta_robot {
@@ -20,12 +22,9 @@ std::array<double, 2> Orientation::calculateOrientation(
     // Step 5b: Ensure plane normal points upward
     last_data_.plane_normal = normalizeUpward(last_data_.plane_normal);
     
-    // Step 5c: Convert normal vector to pitch and roll angles
-    auto [pitch, roll] = geometry::CoordinateTransforms::vectorToRollPitch(
-        last_data_.plane_normal[0], 
-        last_data_.plane_normal[1], 
-        last_data_.plane_normal[2]
-    );
+    // Step 5c: Convert normal vector to pitch and roll angles using Eigen for better stability
+    Eigen::Vector3d normal_eigen = eigen_utils::arrayToVector3d(last_data_.plane_normal);
+    auto [pitch, roll] = geometry::CoordinateTransforms::vectorToRollPitch(normal_eigen);
     
     last_data_.pitch = pitch;
     last_data_.roll = roll;
@@ -55,39 +54,46 @@ bool Orientation::validateOrientation(double pitch, double roll) const {
 std::array<double, 3> Orientation::calculatePlaneNormal(
     const std::array<std::array<double, 3>, 3>& actuator_positions
 ) {
-    const auto& A_optimized = actuator_positions[0];
-    const auto& B_optimized = actuator_positions[1];
-    const auto& C_optimized = actuator_positions[2];
+    // Use Eigen for better numerical stability and performance
+    Eigen::Vector3d A = eigen_utils::arrayToVector3d(actuator_positions[0]);
+    Eigen::Vector3d B = eigen_utils::arrayToVector3d(actuator_positions[1]);
+    Eigen::Vector3d C = eigen_utils::arrayToVector3d(actuator_positions[2]);
     
     // Calculate vectors AB and AC
-    last_data_.vector_AB = {
-        B_optimized[0] - A_optimized[0],
-        B_optimized[1] - A_optimized[1],
-        B_optimized[2] - A_optimized[2]
-    };
+    Eigen::Vector3d AB = B - A;
+    Eigen::Vector3d AC = C - A;
     
-    last_data_.vector_AC = {
-        C_optimized[0] - A_optimized[0],
-        C_optimized[1] - A_optimized[1],
-        C_optimized[2] - A_optimized[2]
-    };
+    // Store for debugging (convert back to arrays)
+    last_data_.vector_AB = eigen_utils::vector3dToArray(AB);
+    last_data_.vector_AC = eigen_utils::vector3dToArray(AC);
     
-    // Calculate cross product to get plane normal
-    std::array<double, 3> plane_normal = geometry::CoordinateTransforms::crossProduct(
-        last_data_.vector_AB, last_data_.vector_AC
-    );
+    // Calculate cross product using safe method
+    Eigen::Vector3d plane_normal = geometry::CoordinateTransforms::safeCrossProduct(AB, AC);
     
     // Store magnitude for debugging
-    last_data_.plane_normal_magnitude = geometry::CoordinateTransforms::magnitude(plane_normal);
+    last_data_.plane_normal_magnitude = plane_normal.norm();
     
-    // Check if plane normal is valid (non-zero)
-    if (last_data_.plane_normal_magnitude < constants::EPSILON) {
+    // Check for degenerate triangles using improved detection
+    if (constants::is_degenerate_magnitude(last_data_.plane_normal_magnitude)) {
         // Return default upward normal if calculation fails
         return {0, 0, 1};
     }
     
-    // Normalize the plane normal
-    return geometry::CoordinateTransforms::normalize(plane_normal);
+    // Additional check: ensure vectors aren't parallel using Eigen
+    double cross_magnitude = plane_normal.norm();
+    double ab_magnitude = AB.norm();
+    double ac_magnitude = AC.norm();
+    
+    // Improved parallel vector detection
+    if (cross_magnitude < constants::PARALLEL_VECTOR_TOLERANCE * ab_magnitude * ac_magnitude) {
+        // Vectors are nearly parallel
+        return {0, 0, 1};
+    }
+    
+    // Normalize using safe method
+    Eigen::Vector3d normalized = geometry::CoordinateTransforms::safeNormalize(plane_normal);
+    
+    return eigen_utils::vector3dToArray(normalized);
 }
 
 std::array<double, 3> Orientation::normalizeUpward(const std::array<double, 3>& plane_normal) {

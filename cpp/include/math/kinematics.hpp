@@ -2,6 +2,7 @@
 
 #include <array>
 #include <vector>
+#include <Eigen/Dense>
 #include "geometry/static_geometry.hpp"
 #include "delta_constants.hpp"
 
@@ -11,6 +12,7 @@ namespace math {
 /**
  * @brief Inverse kinematics calculations for delta robot
  * Handles Steps 2 and 3: Top positions and Fermat point
+ * Enhanced with Eigen integration for better performance and numerical stability
  */
 class Kinematics {
 public:
@@ -70,7 +72,7 @@ private:
         const std::array<double, 3>& plane_normal
     );
     
-    // Step 3 helper methods
+    // Step 3 helper methods (kept for compatibility, internally use Eigen)
     std::array<double, 3> calculateTriangleSides(
         const std::array<std::array<double, 3>, 3>& points
     );

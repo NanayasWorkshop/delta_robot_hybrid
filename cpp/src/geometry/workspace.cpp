@@ -24,18 +24,28 @@ std::array<double, 3> Workspace::verifyAndCorrectTarget(const std::array<double,
         target_z - point_H[2]
     };
     
-    // Calculate distance
+    // Calculate distance with improved numerical stability
     double H_to_target_distance = std::sqrt(
         H_to_target[0] * H_to_target[0] +
         H_to_target[1] * H_to_target[1] +
         H_to_target[2] * H_to_target[2]
     );
     
+    // Handle degenerate case where target is at working height
+    if (H_to_target_distance < constants::MIN_DISTANCE_TOLERANCE) {
+        // Return a point slightly above working height
+        return {0, 0, working_height_ + constants::MIN_DISTANCE_TOLERANCE};
+    }
+    
     std::array<double, 3> z_axis = {0, 0, 1};
     double dot_product = H_to_target[0] * z_axis[0] + H_to_target[1] * z_axis[1] + H_to_target[2] * z_axis[2];
-    // Use trigonometric clamping constants
-    double angle_from_z = std::acos(std::clamp(dot_product / H_to_target_distance, 
-                                              constants::TRIG_CLAMP_MIN, constants::TRIG_CLAMP_MAX));
+    
+    // Improved numerical stability for acos
+    double normalized_dot = dot_product / H_to_target_distance;
+    normalized_dot = std::clamp(normalized_dot, 
+                               constants::SAFE_TRIG_CLAMP_MIN, 
+                               constants::SAFE_TRIG_CLAMP_MAX);
+    double angle_from_z = std::acos(normalized_dot);
     
     if (H_to_target[2] < 0 || angle_from_z > workspace_cone_angle_rad_) {
         return projectOntoConeBoundary(target_point, H_to_target, H_to_target_distance);
@@ -68,7 +78,8 @@ std::array<double, 3> Workspace::projectOntoConeBoundary(
     double current_xy_distance = std::sqrt(H_to_target[0] * H_to_target[0] + H_to_target[1] * H_to_target[1]);
     std::array<double, 2> corrected_xy;
     
-    if (current_xy_distance < epsilon_) {
+    // Improved handling of degenerate cases
+    if (current_xy_distance < constants::MIN_DISTANCE_TOLERANCE) {
         corrected_xy = {xy_distance_at_max_angle, 0};
     } else {
         double scale_factor = xy_distance_at_max_angle / current_xy_distance;

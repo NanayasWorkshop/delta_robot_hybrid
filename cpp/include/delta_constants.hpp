@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <algorithm>
 
 namespace delta_robot {
 namespace constants {
@@ -25,10 +26,20 @@ constexpr double ANGLE_TOLERANCE = 1e-8;             // For angle calculations
 constexpr double MIN_DISTANCE_TOLERANCE = 1e-6;      // Minimum meaningful distance
 constexpr double WORKSPACE_DISTANCE_TOLERANCE = 1e-3; // Workspace boundary precision
 
+// =================== NEW: Numerical Stability Constants ===================
+constexpr double DEGENERATE_TRIANGLE_TOLERANCE = 1e-8;  // For nearly flat triangles
+constexpr double PARALLEL_VECTOR_TOLERANCE = 1e-10;     // For parallel vectors
+constexpr double SAFE_DIVISION_THRESHOLD = 1e-12;       // Safe division threshold
+constexpr double NORMALIZED_DOT_EPSILON = 1e-15;        // For acos input safety
+constexpr double MATRIX_CONDITION_THRESHOLD = 1e-12;    // For matrix conditioning
+
 // =================== Trigonometric Constants ===================
 // Clamping bounds for trigonometric functions to avoid domain errors
 constexpr double TRIG_CLAMP_MIN = -1.0;
 constexpr double TRIG_CLAMP_MAX = 1.0;
+// Safe clamping with epsilon margins
+constexpr double SAFE_TRIG_CLAMP_MIN = -1.0 + NORMALIZED_DOT_EPSILON;
+constexpr double SAFE_TRIG_CLAMP_MAX = 1.0 - NORMALIZED_DOT_EPSILON;
 
 // =================== Fermat Point Constants ===================
 constexpr double FERMAT_ANGLE_OFFSET = M_PI / 3.0;  // 60 degrees for Fermat geometry
@@ -36,9 +47,27 @@ constexpr double FERMAT_MIN_DENOMINATOR = EPSILON;  // Prevent division by zero
 
 // =================== Geometry Constants ===================
 // Base actuator positions (angles in radians)
-constexpr double BASE_A_ANGLE = M_PI / 2.0;                // 0 degrees (top)
+constexpr double BASE_A_ANGLE = M_PI / 2.0;                // 90 degrees (top)
 constexpr double BASE_B_ANGLE = -M_PI / 6.0;        // -30 degrees (bottom right)
 constexpr double BASE_C_ANGLE = -5.0 * M_PI / 6.0;  // -150 degrees (bottom left)
+
+// =================== Utility Functions ===================
+// Inline utility functions for better numerical stability
+inline constexpr double clamp(double value, double min_val, double max_val) {
+    return std::max(min_val, std::min(value, max_val));
+}
+
+inline constexpr double safe_clamp_trig(double value) {
+    return clamp(value, SAFE_TRIG_CLAMP_MIN, SAFE_TRIG_CLAMP_MAX);
+}
+
+inline constexpr bool is_safe_for_division(double denominator, double threshold = SAFE_DIVISION_THRESHOLD) {
+    return std::abs(denominator) > threshold;
+}
+
+inline constexpr bool is_degenerate_magnitude(double magnitude, double threshold = VECTOR_MAGNITUDE_TOLERANCE) {
+    return magnitude < threshold;
+}
 
 // =================== Result Vector Indices (Legacy - To Be Removed) ===================
 // These will be removed once the result structure is fully implemented

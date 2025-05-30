@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <Eigen/Dense>
 #include "geometry/coordinate_transforms.hpp"
 #include "delta_constants.hpp"
 
@@ -10,6 +11,7 @@ namespace math {
 /**
  * @brief Platform orientation and prismatic length calculations
  * Handles Steps 5 and 6: Pitch/Roll angles and prismatic actuator length
+ * Enhanced with Eigen integration for better numerical stability
  */
 class Orientation {
 public:
@@ -65,6 +67,7 @@ private:
     
     /**
      * @brief Calculate plane normal from three actuator positions
+     * Enhanced with Eigen for better numerical stability
      */
     std::array<double, 3> calculatePlaneNormal(
         const std::array<std::array<double, 3>, 3>& actuator_positions
