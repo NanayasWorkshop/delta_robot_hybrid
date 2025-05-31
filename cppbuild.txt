@@ -12,7 +12,7 @@ python3 test.py --num-points 100 --compare --visualize
 
 python3 test.py --visualize-math --math-points "2, 28, 150"
 
-
+python3 test.py --num-points 100 --compare-formats
 
 
 git add .
@@ -20,3 +20,4 @@ git commit -m "Initial commit"
 
 
 git push -u origin main
+

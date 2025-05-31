@@ -196,41 +196,21 @@ class DeltaMathVisualizer:
         step2_data = self.extract_step2_data(target_point)
         step3_data = self.extract_step3_data(step2_data['actuator_3d_positions'])
         
-        # Create comprehensive visualization
-        fig = plt.figure(figsize=(20, 16))
+        # Create 2-column layout: large 3D plot left, summary + small 3D plot right
+        fig = plt.figure(figsize=(20, 10))
         fig.suptitle(f'Delta Robot Math Visualization - Target: {target_point}', fontsize=16)
         
-        # 1. Step 2: Top Position Calculation (3D)
-        ax1 = plt.subplot(3, 4, (1, 5), projection='3d')
+        # Left column: Step 2 - Top Position Calculation (3D) - Large
+        ax1 = plt.subplot2grid((2, 2), (0, 0), rowspan=2, projection='3d')
         self._plot_step2_3d(ax1, step2_data)
         
-        # 2. Step 2: Top view
-        ax2 = plt.subplot(3, 4, 2)
-        self._plot_step2_top_view(ax2, step2_data)
+        # Right top: Final Results
+        ax2 = plt.subplot2grid((2, 2), (0, 1))
+        self._plot_final_results(ax2, cpp_result, step2_data, step3_data)
         
-        # 3. Step 2: Height calculation
-        ax3 = plt.subplot(3, 4, 3)
-        self._plot_height_calculation(ax3, step2_data)
-        
-        # 4. Step 2: Vector analysis
-        ax4 = plt.subplot(3, 4, 4)
-        self._plot_vector_analysis(ax4, step2_data)
-        
-        # 5. Step 3: Fermat point (3D)
-        ax5 = plt.subplot(3, 4, (6, 10), projection='3d')
-        self._plot_step3_3d(ax5, step3_data)
-        
-        # 6. Step 3: Triangle geometry
-        ax6 = plt.subplot(3, 4, 7)
-        self._plot_triangle_2d(ax6, step3_data)
-        
-        # 7. Step 3: Angles and weights
-        ax7 = plt.subplot(3, 4, 8)
-        self._plot_angles_and_weights(ax7, step3_data)
-        
-        # 8. Final results comparison
-        ax8 = plt.subplot(3, 4, (9, 12))
-        self._plot_final_results(ax8, cpp_result, step2_data, step3_data)
+        # Right bottom: Step 3 - Fermat Point Calculation (3D) - Smaller
+        ax3 = plt.subplot2grid((2, 2), (1, 1), projection='3d')
+        self._plot_step3_3d(ax3, step3_data)
         
         plt.tight_layout()
         
@@ -275,9 +255,21 @@ class DeltaMathVisualizer:
             ax.plot([base_pos[0], pos[0]], [base_pos[1], pos[1]], [0, pos[2]], 
                    color=color, linewidth=3, alpha=0.7)
         
-        # Vectors from your calculations
-        ax.quiver(0, 0, 0, *data['direction_vector'], color='orange', 
-                 arrow_length_ratio=0.1, linewidth=3, label='Direction vector')
+        # Vectors and lines from your calculations
+        # Direction vector as dotted yellow line
+        ax.plot([0, data['direction_vector'][0]], [0, data['direction_vector'][1]], 
+               [0, data['direction_vector'][2]], 'y--', linewidth=3, label='Direction vector')
+        
+        # Connect origin to H with purple line
+        ax.plot([0, data['H'][0]], [0, data['H'][1]], [0, data['H'][2]], 
+               'purple', linewidth=3, label='Origin to H')
+        
+        # Connect G to Target with colored line
+        ax.plot([data['G'][0], data['target_point'][0]], 
+               [data['G'][1], data['target_point'][1]], 
+               [data['G'][2], data['target_point'][2]], 
+               'orange', linewidth=3, label='G to Target')
+        
         ax.plot([data['H'][0], data['G'][0]], [data['H'][1], data['G'][1]], 
                [data['H'][2], data['G'][2]], 'r--', linewidth=3, label='H-G line')
         
@@ -286,73 +278,6 @@ class DeltaMathVisualizer:
         ax.set_ylabel('Y (mm)')
         ax.set_zlabel('Z (mm)')
         ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    
-    def _plot_step2_top_view(self, ax, data):
-        """Top view of Step 2"""
-        # Base circle
-        circle = plt.Circle((0, 0), self.robot_radius, fill=False, color='black', linewidth=2)
-        ax.add_patch(circle)
-        
-        # Points projected to XY plane
-        colors = ['red', 'green', 'blue']
-        for i, (base_pos, color) in enumerate(zip(self.base_positions, colors)):
-            ax.scatter(base_pos[0], base_pos[1], color=color, s=100, 
-                      label=f'Base {["A", "B", "C"][i]}')
-        
-        # Actuator projections
-        for i, (pos, color) in enumerate(zip(data['actuator_3d_positions'], colors)):
-            ax.scatter(pos[0], pos[1], color=color, s=80, marker='D', alpha=0.7)
-        
-        ax.scatter(data['target_point'][0], data['target_point'][1], 
-                  color='orange', s=150, marker='*', label='Target (projected)')
-        ax.scatter(data['H'][0], data['H'][1], color='purple', s=100, marker='s')
-        ax.scatter(data['G'][0], data['G'][1], color='red', s=100, marker='^')
-        
-        ax.set_title('Step 2: Top View')
-        ax.set_xlabel('X (mm)')
-        ax.set_ylabel('Y (mm)')
-        ax.grid(True, alpha=0.3)
-        ax.axis('equal')
-        ax.legend()
-    
-    def _plot_height_calculation(self, ax, data):
-        """Bar chart of calculated heights"""
-        heights = data['actuator_heights']
-        bases = ['A', 'B', 'C']
-        colors = ['red', 'green', 'blue']
-        
-        bars = ax.bar(bases, heights, color=colors, alpha=0.7)
-        
-        # Add height values
-        for bar, height in zip(bars, heights):
-            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.5, 
-                   f'{height:.2f}', ha='center', va='bottom')
-        
-        ax.set_ylabel('Height (mm)')
-        ax.set_title('Step 2d: Calculated Actuator Heights')
-        ax.grid(True, alpha=0.3)
-        
-        # Add the formula from your C++ code
-        u = data['u_vector']
-        formula = f'Height = -(u_x × base_x + u_y × base_y) / u_z\n'
-        formula += f'u = [{u[0]:.2f}, {u[1]:.2f}, {u[2]:.2f}]'
-        ax.text(0.02, 0.98, formula, transform=ax.transAxes, va='top',
-               bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
-    
-    def _plot_vector_analysis(self, ax, data):
-        """Vector relationships"""
-        # Plot key vectors
-        ax.arrow(0, 0, data['direction_vector'][0]/10, data['direction_vector'][1]/10, 
-                head_width=1, head_length=1, fc='orange', ec='orange', label='Direction')
-        ax.arrow(0, 0, data['u_vector'][0], data['u_vector'][1], 
-                head_width=1, head_length=1, fc='red', ec='red', label='u vector')
-        
-        ax.set_title('Step 2: Vector Analysis')
-        ax.set_xlabel('X component')
-        ax.set_ylabel('Y component')
-        ax.grid(True, alpha=0.3)
-        ax.legend()
-        ax.axis('equal')
     
     def _plot_step3_3d(self, ax, data):
         """3D visualization of Fermat point calculation"""
@@ -392,67 +317,13 @@ class DeltaMathVisualizer:
         ax.set_zlabel('Z (mm)')
         ax.legend()
     
-    def _plot_triangle_2d(self, ax, data):
-        """2D triangle showing angles and sides"""
-        # Project to XY plane
-        A_2d = data['A_Point'][:2]
-        B_2d = data['B_Point'][:2] 
-        C_2d = data['C_Point'][:2]
-        fermat_2d = data['fermat_point'][:2]
-        
-        # Triangle
-        triangle = plt.Polygon([A_2d, B_2d, C_2d], fill=False, edgecolor='black', linewidth=2)
-        ax.add_patch(triangle)
-        
-        # Vertices
-        colors = ['red', 'green', 'blue']
-        points_2d = [A_2d, B_2d, C_2d]
-        labels = ['A', 'B', 'C']
-        
-        for point, color, label in zip(points_2d, colors, labels):
-            ax.scatter(*point, color=color, s=150, label=label)
-        
-        ax.scatter(*fermat_2d, color='magenta', s=200, marker='*', label='Fermat')
-        
-        # Side length labels
-        sides = data['side_lengths']
-        ax.text(*(A_2d + B_2d)/2, f"c={sides['c']:.1f}", ha='center', va='bottom')
-        ax.text(*(B_2d + C_2d)/2, f"a={sides['a']:.1f}", ha='center', va='bottom')  
-        ax.text(*(C_2d + A_2d)/2, f"b={sides['b']:.1f}", ha='center', va='bottom')
-        
-        ax.set_title('Step 3: Triangle Geometry')
-        ax.set_xlabel('X (mm)')
-        ax.set_ylabel('Y (mm)')
-        ax.axis('equal')
-        ax.grid(True, alpha=0.3)
-        ax.legend()
-    
-    def _plot_angles_and_weights(self, ax, data):
-        """Angles and lambda weights"""
-        angles = data['angles']
-        lambdas = data['lambdas']
-        
-        labels = ['α (A)', 'β (B)', 'γ (C)']
-        angle_values = [np.degrees(angles['Alpha']), np.degrees(angles['Beta']), np.degrees(angles['Gamma'])]
-        lambda_values = [lambdas['LambdaA'], lambdas['LambdaB'], lambdas['LambdaC']]
-        
-        x = np.arange(len(labels))
-        width = 0.35
-        
-        ax.bar(x - width/2, angle_values, width, label='Angles (°)', alpha=0.7)
-        ax.bar(x + width/2, lambda_values, width, label='Lambda weights', alpha=0.7)
-        
-        ax.set_xlabel('Vertices')
-        ax.set_ylabel('Values')
-        ax.set_title('Step 3: Angles & Fermat Weights')
-        ax.set_xticks(x)
-        ax.set_xticklabels(labels)
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-    
     def _plot_final_results(self, ax, cpp_result, step2_data, step3_data):
         """Summary of final results"""
         ax.axis('off')
+        
+        # Calculate additional distances
+        origin_to_H_distance = np.linalg.norm(step2_data['H'])
+        G_to_target_distance = np.linalg.norm(np.array(step2_data['target_point']) - step2_data['G'])
         
         # Create summary text
         summary = f"""
@@ -469,6 +340,10 @@ Motor Positions: {[f'{m:.2f}' for m in cpp_result.motor_positions]}
 STEP 3 RESULTS:
 Fermat Point: {[f'{f:.2f}' for f in step3_data['fermat_point']]}
 Your C++ Fermat: {[f'{f:.2f}' for f in cpp_result.fermat_point]}
+
+KEY DISTANCES:
+Origin to H: {origin_to_H_distance:.2f} mm
+G to Target: {G_to_target_distance:.2f} mm
 
 FINAL OUTPUT:
 Pitch: {cpp_result.pitch:.4f} rad ({np.degrees(cpp_result.pitch):.2f}°)
