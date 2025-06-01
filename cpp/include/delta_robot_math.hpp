@@ -59,6 +59,12 @@ public:
      */
     TimingStats getLastOperationStats() const;
     
+    /**
+     * @brief Get access to math orchestrator for advanced debugging/visualization
+     * @return Reference to the internal math orchestrator
+     */
+    const math::MathOrchestrator& getMathOrchestrator() const;
+    
 private:
     // The actual calculation engine
     DeltaCalculations calculator_;

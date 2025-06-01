@@ -34,4 +34,8 @@ DeltaRobotMath::TimingStats DeltaRobotMath::getLastOperationStats() const {
     return calculator_.getLastOperationStats();
 }
 
+const math::MathOrchestrator& DeltaRobotMath::getMathOrchestrator() const {
+    return calculator_.getMathOrchestrator();
+}
+
 } // namespace delta_robot

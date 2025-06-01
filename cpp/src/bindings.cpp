@@ -3,6 +3,8 @@
 #include <pybind11/numpy.h>
 #include "delta_robot_math.hpp"
 #include "delta_constants.hpp"
+#include "math/math_orchestrator.hpp"
+#include "math/kinematics.hpp"
 
 namespace py = pybind11;
 
@@ -22,6 +24,24 @@ PYBIND11_MODULE(delta_robot_cpp, m) {
         .def_readwrite("corrected_target", &delta_robot::CalculationResult::corrected_target)
         .def_readwrite("workspace_corrected", &delta_robot::CalculationResult::workspace_corrected);
     
+    // NEW: Bind KinematicsData structure for math visualization
+    py::class_<delta_robot::math::Kinematics::KinematicsData>(m, "KinematicsData")
+        .def(py::init<>())
+        .def_readwrite("direction_vector", &delta_robot::math::Kinematics::KinematicsData::direction_vector)
+        .def_readwrite("plane_normal", &delta_robot::math::Kinematics::KinematicsData::plane_normal)
+        .def_readwrite("plane_center", &delta_robot::math::Kinematics::KinematicsData::plane_center)
+        .def_readwrite("H_point", &delta_robot::math::Kinematics::KinematicsData::H_point)
+        .def_readwrite("G_point", &delta_robot::math::Kinematics::KinematicsData::G_point)
+        .def_readwrite("u_vector", &delta_robot::math::Kinematics::KinematicsData::u_vector)
+        .def_readwrite("triangle_sides", &delta_robot::math::Kinematics::KinematicsData::triangle_sides)
+        .def_readwrite("triangle_angles", &delta_robot::math::Kinematics::KinematicsData::triangle_angles)
+        .def_readwrite("lambda_weights", &delta_robot::math::Kinematics::KinematicsData::lambda_weights);
+    
+    // NEW: Bind Kinematics class (minimal - just what we need for visualization)
+    py::class_<delta_robot::math::Kinematics>(m, "Kinematics")
+        .def("get_last_calculation_data", &delta_robot::math::Kinematics::getLastCalculationData,
+             py::return_value_policy::reference_internal);
+    
     // Bind the main DeltaRobotMath class
     py::class_<delta_robot::DeltaRobotMath>(m, "DeltaRobotMath")
         .def(py::init<double, double, double, double, double, double>(),
@@ -36,7 +56,10 @@ PYBIND11_MODULE(delta_robot_cpp, m) {
         .def("calculate_joint_values_legacy", &delta_robot::DeltaRobotMath::calculateJointValuesLegacy,
              "Calculate joint values returning legacy vector format (deprecated)")
         .def("verify_and_correct_target", &delta_robot::DeltaRobotMath::verifyAndCorrectTarget)
-        .def("get_last_operation_stats", &delta_robot::DeltaRobotMath::getLastOperationStats);
+        .def("get_last_operation_stats", &delta_robot::DeltaRobotMath::getLastOperationStats)
+        .def("get_kinematics", [](const delta_robot::DeltaRobotMath& self) -> const delta_robot::math::Kinematics& {
+            return self.getMathOrchestrator().getKinematics();
+        }, py::return_value_policy::reference_internal, "Get access to kinematics module for visualization");
     
     // Bind TimingStats
     py::class_<delta_robot::DeltaRobotMath::TimingStats>(m, "TimingStats")

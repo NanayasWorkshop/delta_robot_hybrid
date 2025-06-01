@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Test script for Delta Robot hybrid Python/C++ implementation
-Now includes mathematical step visualization
+Now includes mathematical step visualization with REAL C++ data
 """
 
 import time
@@ -82,9 +82,9 @@ def main():
             math_data = math_viz.visualize_complete_calculation(math_point, save_path)
             
             if math_data:
-                print("✓ Mathematical visualization complete!")
+                print("Mathematical visualization complete!")
                 
-                # Print some extracted data for verification
+                # Print extracted data using NEW data format
                 step2 = math_data['step2_data']
                 step3 = math_data['step3_data']
                 cpp_result = math_data['cpp_result']
@@ -94,25 +94,34 @@ def main():
                 print(f"  Actuator heights: {[f'{h:.2f}' for h in step2['actuator_heights']]}")
                 
                 print(f"\nExtracted Step 3 Data:")
-                print(f"  Triangle sides: a={step3['side_lengths']['a']:.2f}, b={step3['side_lengths']['b']:.2f}, c={step3['side_lengths']['c']:.2f}")
+                # Use NEW data format: triangle_sides instead of side_lengths
+                print(f"  Triangle sides: a={step3['triangle_sides']['a']:.2f}, b={step3['triangle_sides']['b']:.2f}, c={step3['triangle_sides']['c']:.2f}")
                 print(f"  Fermat point: {[f'{f:.2f}' for f in step3['fermat_point']]}")
                 
                 print(f"\nC++ Result Validation:")
                 print(f"  Fermat match: {np.allclose(step3['fermat_point'], cpp_result.fermat_point, atol=1e-6)}")
                 print(f"  Final pitch: {cpp_result.pitch:.4f} rad ({np.degrees(cpp_result.pitch):.2f}°)")
                 print(f"  Final roll: {cpp_result.roll:.4f} rad ({np.degrees(cpp_result.roll):.2f}°)")
+                print(f"  Data source: {math_data.get('data_source', 'UNKNOWN')}")
                 
-                # Show the plot if no save path specified
+                # Force matplotlib to show the plot
                 if not save_path:
-                    import matplotlib.pyplot as plt
-                    plt.show()
+                    try:
+                        import matplotlib.pyplot as plt
+                        print("Displaying matplotlib visualization...")
+                        plt.show(block=True)  # Force blocking show
+                    except Exception as e:
+                        print(f"Could not display plot: {e}")
+                        print("Try using --save-math-plot to save to file instead")
                 
             else:
-                print("✗ Mathematical visualization failed!")
+                print("Mathematical visualization failed!")
                 return 1
                 
         except Exception as e:
             print(f"Error creating math visualization: {e}")
+            import traceback
+            traceback.print_exc()
             return 1
         
         # If only math visualization requested, exit here
@@ -212,7 +221,11 @@ def main():
             visualizer.save(args.save_plot)
         
         if args.visualize:
-            visualizer.show()
+            try:
+                import matplotlib.pyplot as plt
+                plt.show(block=True)  # Force blocking show for main visualization too
+            except Exception as e:
+                print(f"Could not display main plot: {e}")
 
     return 0
 
