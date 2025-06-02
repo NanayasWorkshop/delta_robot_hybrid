@@ -1,8 +1,43 @@
 #include "math/math_orchestrator.hpp"
 #include <algorithm>
+#include <cmath>
 
 namespace delta_robot {
 namespace math {
+
+/**
+ * @brief Normalize target point to exactly 100mm distance from origin
+ * @param target_point Input target point [x, y, z]
+ * @return Normalized target point at exactly 100mm distance with positive Z
+ */
+static std::array<double, 3> normalizeTargetTo100mm(const std::array<double, 3>& target_point) {
+    double x = target_point[0];
+    double y = target_point[1];
+    double z = target_point[2];
+    
+    // Calculate current magnitude
+    double magnitude = std::sqrt(x*x + y*y + z*z);
+    
+    // Handle zero vector case
+    if (magnitude < 1e-10) {
+        return {0.0, 0.0, 100.0};
+    }
+    
+    // Ensure Z is positive (flip vector if needed)
+    if (z < 0) {
+        x = -x;
+        y = -y;
+        z = -z;
+    }
+    
+    // Normalize and scale to exactly 100mm
+    double scale_factor = 100.0 / magnitude;
+    return {
+        x * scale_factor,
+        y * scale_factor,
+        z * scale_factor
+    };
+}
 
 MathOrchestrator::MathOrchestrator(
     double robot_radius,
@@ -25,14 +60,19 @@ std::optional<CalculationResult> MathOrchestrator::calculateJointValues(const st
     CalculationResult result;
     result.original_target = target_point;
     
-    // Step 1: Verify and correct target using workspace module
+    // NEW: Normalize input target to exactly 100mm distance
+    std::array<double, 3> normalized_target = normalizeTargetTo100mm(target_point);
+    
+    // Step 1: Verify and correct the NORMALIZED target using workspace module
     utils::Timer verify_timer;
-    std::array<double, 3> corrected_target = workspace_.verifyAndCorrectTarget(target_point);
+    std::array<double, 3> corrected_target = workspace_.verifyAndCorrectTarget(normalized_target);
     result.corrected_target = corrected_target;
-    result.workspace_corrected = !std::equal(target_point.begin(), target_point.end(), corrected_target.begin());
+    
+    // Check if workspace correction was needed on the normalized target
+    result.workspace_corrected = !std::equal(normalized_target.begin(), normalized_target.end(), corrected_target.begin());
     last_timing_stats_.verify_and_correct_ms = verify_timer.elapsed_ms();
     
-    // Execute the main calculation sequence
+    // Execute the main calculation sequence with the corrected normalized target
     auto sequence_result = executeCalculationSequence(corrected_target);
     
     if (!sequence_result) {
@@ -41,8 +81,8 @@ std::optional<CalculationResult> MathOrchestrator::calculateJointValues(const st
     }
     
     // Update the result with original and corrected targets
-    sequence_result->original_target = target_point;
-    sequence_result->corrected_target = corrected_target;
+    sequence_result->original_target = target_point;          // Keep original unnormalized
+    sequence_result->corrected_target = corrected_target;     // This is the normalized + corrected
     sequence_result->workspace_corrected = result.workspace_corrected;
     
     last_timing_stats_.total_ms = total_timer.elapsed_ms();
