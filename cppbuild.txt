@@ -21,3 +21,10 @@ git commit -m "Initial commit"
 
 git push -u origin main
 
+
+
+git revert --no-commit HEAD..28b6f10
+git commit -m "Revert back to 28b6f10"
+git push origin main
+
+git clean -fdx
